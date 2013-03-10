@@ -3,6 +3,9 @@ import inspect
 import os
 import sys
 import warnings
+from google.appengine.api import memcache
+from jinja2.bccache import MemcachedBytecodeCache
+from pyramid.path import AssetResolver
 
 from zope.interface import implementer
 from zope.interface import Interface
@@ -165,9 +168,9 @@ class SmartAssetSpecLoader(FileSystemLoader):
     def _get_asset_source_fileinfo(self, environment, template):
         if getattr(environment, '_default_package', None) is not None:
             pname = environment._default_package
-            filename = abspath_from_asset_spec(template, pname)
+            filename = AssetResolver(pname).resolve(template).abspath()
         else:
-            filename = abspath_from_asset_spec(template)
+            filename = AssetResolver().resolve(template).abspath()
         fileinfo = FileInfo(filename, self.encoding)
         return fileinfo
 
@@ -249,7 +252,7 @@ def _get_or_build_default_environment(registry):
     settings = registry.settings
     kw = {}
 
-    package = _caller_package(('pyramid_jinja2', 'jinja2', 'pyramid.config'))
+    package = None
     debug = asbool(settings.get('debug_templates', False))
 
     # get basic environment jinja2 settings
@@ -291,7 +294,7 @@ def _get_or_build_default_environment(registry):
         settings.get('jinja2.bytecode_caching_directory', None)
     if bytecode_caching:
         kw['bytecode_cache'] = \
-            FileSystemBytecodeCache(bytecode_caching_directory)
+            MemcachedBytecodeCache(memcache)
         # clear cache on exit
         atexit.register(kw['bytecode_cache'].clear)
 
